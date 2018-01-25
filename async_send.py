@@ -4,17 +4,18 @@ import pika
 import json
 import logging
 
-log_format = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) -35s %(lineno) -5d: %(message)s')
+log_format = '%(levelname) -10s %(asctime)s %(name) -30s %(funcName) -35s %(lineno) -5d: %(message)s'
 logger = logging.getLogger(__name__)
 
-class sender(object):
+
+class Sender(object):
     exchange = ''
     exchange_type = 'topic'
     queue = 'async_test'
     routing_key = 'async_queue'
     interval = 1
 
-    def __init__(self,url):
+    def __init__(self, url):
         self._connection = None
         self._channel = None
         self._deliveries = []
@@ -29,7 +30,7 @@ class sender(object):
         logger.info('connecting to %s', self._url)
         return pika.SelectConnection(pika.URLParameters(self._url),
                                      self.on_connection_open,
-                                     stop_ioloop_on_close = False)
+                                     stop_ioloop_on_close=False)
 
     def on_connection_open(self, unused_conncetion):
         logger.info('connection opened')
@@ -45,7 +46,7 @@ class sender(object):
         if self._closing:
             self._connection.ioloop.stop()
         else:
-            logger.warning('The connection closed: %s:%s - retrying',reply_code, reply_text)
+            logger.warning('The connection closed: %s:%s - retrying', reply_code, reply_text)
             self._connection.add_timeout(5, self.reconnect)
 
     def reconnect(self):
@@ -62,7 +63,7 @@ class sender(object):
 
     def open_channel(self):
         logger.info('creating channel')
-        self._connection(on_open_callback = self.on_channel_open)
+        self._connection(on_open_callback=self.on_channel_open)
 
     def on_channel_open(self, channel):
         logger.info('channel opened')
@@ -76,26 +77,26 @@ class sender(object):
         self._channel.add_on_close_callback(self.on_channel_closed)
 
     def on_channel_closed(self, channel, reply_code, reply_text):
-        logger.warning('channel closed: %s: %s', reply_code,reply_text)
+        logger.warning('channel closed: %s: %s', reply_code, reply_text)
         if not self._closing:
             self._connection.close()
 
     def setup_exchange(self, exchange):
         logger.info('declaring exchange %s', exchange)
         self._channel.exchange_declare(self.on_declare_exchangeok,
-                                        exchange,
-                                        self.exchange_type)
+                                       exchange,
+                                       self.exchange_type)
 
     def on_declare_exchangeok(self, unused_frame):
         logger.info('exchange declared')
         self.setup_queue(self.queue)
 
-    def setup_queue(self,queue):
-        logger.info('declaring queue %s',queue)
+    def setup_queue(self, queue):
+        logger.info('declaring queue %s', queue)
         self._channel.queue_declare(self.on_queue_declareok, queue)
 
     def on_queue_declareok(self, method_frame):
-        logger.info('binding %s and %s together with %s',self.exchange,self.queue,self.routing_key)
+        logger.info('binding %s and %s together with %s', self.exchange, self.queue, self.routing_key)
         self._channel.queue_bind(self.on_bindok, self.queue, self.exchange, self.routing_key)
 
     def on_bindok(self, unused_frame):
@@ -116,7 +117,7 @@ class sender(object):
 
         logger.info('received %s for %s', confirmation_type, method_frame.method.delivery_tag)
         if confirmation_type == 'ack':
-            self._acked +=1
+            self._acked += 1
         elif confirmation_type == 'nack':
             self._nacked += 1
 
@@ -128,21 +129,21 @@ class sender(object):
         if self._stopping:
             return
         logger.info('scheduling message in %0.1f seconds', self.interval)
-        self._connection.add_timeout(self.interval,self.publish_message)
+        self._connection.add_timeout(self.interval, self.publish_message)
 
     def publish_message(self):
 
         if self._stopping:
             return
-        message = {'mango':'bango', 'fnylly':'hylly'}
+        message = {'mango': 'bango', 'fnylly': 'hylly'}
         properties = pika.BasicProperties(app_id='sender',
                                           content_type='application/json',
-                                          headers = message)
+                                          headers=message)
 
         self._channel.basic_publish(self.exchange, self.routing_key, json.dumps(message), properties)
-        self._message_number +=1
+        self._message_number += 1
         self._deliveries.append(self._message_number)
-        logger.info('published message # %i',self._message_number)
+        logger.info('published message # %i', self._message_number)
         self.schedule_next_message()
 
     def close_channel(self):
@@ -167,19 +168,16 @@ class sender(object):
         self._closing = True
         self._connection.close()
 
-def main():
-    logging.basicConfig(level=logging.DEBUG, format = log_format)
 
-    send = sender('amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600')
+def main():
+    logging.basicConfig(level=logging.DEBUG, format=log_format)
+
+    send = Sender('amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600')
     try:
         send.run()
     except KeyboardInterrupt:
         send.stop()
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main()
-
-
-
-
-

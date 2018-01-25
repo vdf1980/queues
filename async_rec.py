@@ -8,8 +8,9 @@ This is the consumer (receiver)
 import pika
 import logging
 
-log_format = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) -35s %(lineno) -5d: %(message)s')
+log_format = '%(levelname) -10s %(asctime)s %(name) -30s %(funcName) -35s %(lineno) -5d: %(message)s'
 logger = logging.getLogger(__name__)
+
 
 class Receiver(object):
     exchange = ''
@@ -32,21 +33,21 @@ class Receiver(object):
 
     def on_connection_open(self, unused_connection):
         logger.info("connection opened")
-        self.add_on_connection_close_callback();
+        self.add_on_connection_close_callback()
         self.open_channel()
 
     def add_on_connection_close_callback(self):
         logger.info('adding connection close callback')
         self._connection.add_on_close_callback(self.on_connection_closed)
 
-    def on_connection_closed(self,connection,reply_code,reply_text):
+    def on_connection_closed(self, connection, reply_code, reply_text):
         self._channel = None
         if self._closing:
             self._connection.io_loop.stop()
         else:
             # this is unexpected
-            logger.warning('connection closed. Reopening %s, %s',reply_code,reply_text)
-            self._connection.add_timeout(5,self.reconnect)
+            logger.warning('connection closed. Reopening %s, %s', reply_code, reply_text)
+            self._connection.add_timeout(5, self.reconnect)
 
     def reconnect(self):
         self._connection.ioloop.stop()
@@ -60,7 +61,7 @@ class Receiver(object):
         logger.info('creating new channel')
         self._connection.channel(on_open_callback=self.on_channel_open)
 
-    def on_channel_oepn(self,channel):
+    def on_channel_open(self, channel):
         logger.info('channel opened')
         self._channel = channel
         self.add_on_channel_close_callback()
@@ -71,11 +72,11 @@ class Receiver(object):
         self._channel.add_on_close_callback(self.on_channel_closed)
 
     def on_channel_closed(self, channel, reply_code, reply_text):
-        logger.warning('channel %i closed: (%s) %s',channel,reply_code,reply_text)
+        logger.warning('channel %i closed: (%s) %s', channel, reply_code, reply_text)
         self._connection.close()
 
-    def setup_exchange(self,exchange_name):
-        logger.info('declare exchange %s',exchange_name)
+    def setup_exchange(self, exchange_name):
+        logger.info('declare exchange %s', exchange_name)
         self._channel.exchange_declare(self.on_exchange_declare_ok,
                                        exchange_name,
                                        self.exchange_type)
@@ -85,7 +86,7 @@ class Receiver(object):
         self.setup_queue(self.queue)
 
     def setup_queue(self, queue_name):
-        logger.info('declaring queue %s',queue_name)
+        logger.info('declaring queue %s', queue_name)
         self._channel.queue_declare(self.on_queue_declareok, queue_name)
 
     def on_queue_declareok(self, method_frame):
@@ -111,11 +112,11 @@ class Receiver(object):
             self._channel.close()
 
     def on_message(self, unused_channel, basic_deliver, properties, body):
-        logger.info('message received: %s from %s: %s',basic_deliver.delivery_tag, properties.app_id, body)
+        logger.info('message received: %s from %s: %s', basic_deliver.delivery_tag, properties.app_id, body)
         self.acknowledge_message(basic_deliver.delivery_tag)
 
-    def acknowledge_message(self,delivery_tag):
-        logger.info('acknowledging message %s',delivery_tag)
+    def acknowledge_message(self, delivery_tag):
+        logger.info('acknowledging message %s', delivery_tag)
         self._channel.basic_ack(delivery_tag)
 
     def stop_consuming(self):
@@ -132,7 +133,7 @@ class Receiver(object):
         self._channel.close()
 
     def run(self):
-        self._connection= self.connect()
+        self._connection = self.connect()
         self._connection.ioloop.start()
 
     def stop(self):
@@ -146,13 +147,15 @@ class Receiver(object):
         logger.info('closing connection')
         self._connection.close()
 
+
 def main():
-    logging.basicConfig(level=logging.INFO, format= log_format)
+    logging.basicConfig(level=logging.INFO, format=log_format)
     example = Receiver('amqp://guest:guest@localhost:5672/%2F')
     try:
         example.run()
     except KeyboardInterrupt:
         example.stop()
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main()
