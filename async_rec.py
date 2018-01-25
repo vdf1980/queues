@@ -10,7 +10,7 @@ import logging
 
 log_format = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) -35s %(lineno) -5d: %(message)s')
 logger = logging.getLogger(__name__)
-
+print ("HEJ")
 
 class Receiver(object):
     exchange = ''
