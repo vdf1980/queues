@@ -9,11 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 class Sender(object):
-    exchange = ''
+    exchange = 'pyyh'
     exchange_type = 'topic'
     queue = 'async_test'
     routing_key = 'async_queue'
-    interval = 1
+    interval = 5
 
     def __init__(self, url):
         self._connection = None
@@ -63,7 +63,7 @@ class Sender(object):
 
     def open_channel(self):
         logger.info('creating channel')
-        self._connection(on_open_callback=self.on_channel_open)
+        self._connection.channel(on_open_callback=self.on_channel_open)
 
     def on_channel_open(self, channel):
         logger.info('channel opened')
@@ -78,7 +78,8 @@ class Sender(object):
 
     def on_channel_closed(self, channel, reply_code, reply_text):
         logger.warning('channel closed: %s: %s', reply_code, reply_text)
-        if not self._closing:
+        self._channel = None
+        if not self._stopping:
             self._connection.close()
 
     def setup_exchange(self, exchange):

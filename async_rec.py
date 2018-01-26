@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class Receiver(object):
-    exchange = ''
+    exchange = 'pyyh'
     exchange_type = 'topic'
     queue = 'async_test'
     routing_key = 'async_queue'
@@ -43,7 +43,7 @@ class Receiver(object):
     def on_connection_closed(self, connection, reply_code, reply_text):
         self._channel = None
         if self._closing:
-            self._connection.io_loop.stop()
+            self._connection.ioloop.stop()
         else:
             # this is unexpected
             logger.warning('connection closed. Reopening %s, %s', reply_code, reply_text)
@@ -73,6 +73,7 @@ class Receiver(object):
 
     def on_channel_closed(self, channel, reply_code, reply_text):
         logger.warning('channel %i closed: (%s) %s', channel, reply_code, reply_text)
+        self._channel = None
         self._connection.close()
 
     def setup_exchange(self, exchange_name):
@@ -104,7 +105,7 @@ class Receiver(object):
 
     def add_on_cancel_callback(self):
         logger.info('adding cancel callback for consumer')
-        self._channel.add_on_cancel.callback(self.on_consumer_cancelled)
+        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
 
     def on_consumer_cancelled(self, method_frame):
         logger.info('consumer cancelled %r', method_frame)
@@ -130,7 +131,8 @@ class Receiver(object):
 
     def close_channel(self):
         logger.info('closing channel')
-        self._channel.close()
+        if self._channel:
+            self._channel.close()
 
     def run(self):
         self._connection = self.connect()
