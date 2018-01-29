@@ -216,7 +216,8 @@ class ASynQ(object):
 
     def on_connection_open(self, unused_conncetion):
         """
-        called when the connection is opened. We use it to set up a rescuer if the connection is later closed, and also to open the channel
+        called when the connection is opened. We use it to set up a rescuer if the connection is later closed, and also
+        to open the channel
 
         :param unused_conncetion: unused
         :return: None
