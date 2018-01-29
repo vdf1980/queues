@@ -4,14 +4,16 @@ import pika
 import json
 import logging
 
+
 # TODO: We must setup an instance (?) for each time a message is sent: otherwise ioloop blocks
 
-class asynq(object):
+class ASynQ(object):
     """
     this class implements an asynchronous queue. This should allow total control of pikas weird defaults
     """
 
-    def __init__(self, url, routing_key, log_file = '/dev/null', exchange='yacamc_exchange', exchange_type='direct', queue=None, acked = True):
+    def __init__(self, url, routing_key, log_file='/dev/null', exchange='yacamc_exchange', exchange_type='direct',
+                 queue=None, acked=True):
         """
         this will set up an asynchronous queue on rabbitmq at url, with routing key routing_key, or give access if it
         already exists
@@ -55,7 +57,7 @@ class asynq(object):
         self._connection = self.connect()
         self._connection.ioloop.start()
 
-    ### The following functions set up the actual queue.
+    # The following functions set up the actual queue.
 
     def on_delivery_confirmation(self, method_frame):
         """
@@ -73,7 +75,8 @@ class asynq(object):
             self._nacked += 1
 
         self._deliveries.remove(method_frame.method.delivery_tag)
-        self.logger.info('published %i messages, %i yet to confirm, %i acked and %i nacked', self._message_number, len(self._deliveries), self._acked, self._nacked)
+        self.logger.info('published %i messages, %i yet to confirm, %i acked and %i nacked', self._message_number,
+                         len(self._deliveries), self._acked, self._nacked)
 
     def on_bindok(self, unused_frame):
         """
@@ -83,7 +86,7 @@ class asynq(object):
         :return: None
         """
         self.logger.info('queue bound')
-        if (self.acked):
+        if self.acked:
             # if we wish to care about the servers replies, this is were we set up things
             self.logger.info('issuing confirm.select RPC')
             self._channel.confirm_delivery(self.on_delivery_confirmation)
@@ -107,8 +110,8 @@ class asynq(object):
         self.logger.info('declaring queue %s', self.queue)
         self._channel.queue_declare(self.on_queue_declareok, self.queue)
 
-    ### The following sets up the exchange, which is the part of the queueing system that determines how messages are
-    ### sent from producers to consumers
+    # The following sets up the exchange, which is the part of the queueing system that determines how messages are
+    # sent from producers to consumers
 
     def on_exchange_declareok(self, unused_frame):
         """
@@ -129,8 +132,8 @@ class asynq(object):
         self.logger.info('declaring exchange %s', self.exchange)
         self._channel.exchange_declare(self.on_exchange_declareok, self.exchange, self.exchange_type)
 
-    ### The following functions pertains to the set up of the channel, which is the structure that enables structured
-    ### communication between the client and the rabbitmq server
+    # The following functions pertains to the set up of the channel, which is the structure that enables structured
+    # communication between the client and the rabbitmq server
 
     def on_channel_closed(self, channel, reply_code, reply_text):
         """
@@ -174,7 +177,7 @@ class asynq(object):
         self.logger.info('creating channel')
         self._connection.channel(on_open_callback=self.on_channel_opened)
 
-    ### The following functions are all related to setting up the connection, the most basic part of a queueing system
+    # The following functions are all related to setting up the connection, the most basic part of a queueing system
 
     def reconnect(self):
         """
@@ -231,7 +234,6 @@ class asynq(object):
         self.logger.info('connecting to %s', self._url)
         return pika.SelectConnection(pika.URLParameters(self._url), self.on_connection_open, stop_ioloop_on_close=False)
 
-
     def publish_message(self):
         if self._stopping:
             return
@@ -255,10 +257,7 @@ class asynq(object):
         self._connection.ioloop.start()
         self.logger.info('stopped')
 
-
-
-
-    def start_consuming(self, cb = None):
+    def start_consuming(self, cb=None):
         if cb is None:
             self.logger.error('consumption requires a callback routine')
             return
@@ -305,8 +304,8 @@ class asynq(object):
 
 
 def main():
-
-    send = Sender('amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600')
+    send = ASynQ(url='amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600',
+                 routing_key='asynq_test')
     try:
         send.run()
     except KeyboardInterrupt:
