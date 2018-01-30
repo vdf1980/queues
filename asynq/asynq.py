@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import threading
 
 import pika
 import json
@@ -6,6 +7,8 @@ import logging
 
 
 # TODO: We must setup an instance (?) for each time a message is sent: otherwise ioloop blocks
+import time
+
 
 class ASynQ(object):
     """
@@ -13,7 +16,7 @@ class ASynQ(object):
     """
 
     def __init__(self, url, routing_key, log_file='/dev/null', exchange='yacamc_exchange', exchange_type='direct',
-                 queue=None, acked=True):
+                 queue=None, acked=True, sender = False):
         """
         this will set up an asynchronous queue on rabbitmq at url, with routing key routing_key, or give access if it
         already exists
@@ -24,6 +27,7 @@ class ASynQ(object):
         :param exchange_type: the exchange type we wish to use (usually direct suffices)
         :param queue: the name of the queue. If not set explicitly, this will become the same as the routing_key
         :param acked: if this is true, message acknowledgements will be enabled
+        :param sender: if true, this object will expect to send messages
         """
 
         if queue is None:
@@ -53,8 +57,12 @@ class ASynQ(object):
         self._nacked = 0
         self._message_number = 0
         self._stopping = False
+        self._done_sending = False
 
-        self._connection = self.connect()
+        self.run()
+        #self._connection = self.connect()
+
+    def start_loop(self):
         self._connection.ioloop.start()
 
     # The following functions set up the actual queue.
@@ -77,6 +85,7 @@ class ASynQ(object):
         self._deliveries.remove(method_frame.method.delivery_tag)
         self.logger.info('published %i messages, %i yet to confirm, %i acked and %i nacked', self._message_number,
                          len(self._deliveries), self._acked, self._nacked)
+        self._done_sending = True
 
     def on_bindok(self, unused_frame):
         """
@@ -235,10 +244,9 @@ class ASynQ(object):
         self.logger.info('connecting to %s', self._url)
         return pika.SelectConnection(pika.URLParameters(self._url), self.on_connection_open, stop_ioloop_on_close=False)
 
-    def publish_message(self):
+    def send(self,message):
         if self._stopping:
             return
-        message = {'mango': 'bango', 'fnylly': 'hylly'}
         properties = pika.BasicProperties(app_id='sender',
                                           content_type='application/json',
                                           headers=message)
@@ -247,6 +255,10 @@ class ASynQ(object):
         self._message_number += 1
         self._deliveries.append(self._message_number)
         self.logger.info('published message # %i', self._message_number)
+        self._connection.ioloop.start()
+        while not self._done_sending:
+            time.sleep(0.01)
+        self.stop()
 
     def stop(self):
         self.logger.info('stopping')
@@ -300,15 +312,19 @@ class ASynQ(object):
             self._channel.close()
 
     def run(self):
+        print("HEJ")
         self._connection = self.connect()
-        self._connection.ioloop.start()
+        #self._connection.ioloop.start()
 
+#class Receiver:
+#    def __init__(self,url,routing_key,cb):
 
 def main():
     send = ASynQ(url='amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600',
-                 routing_key='asynq_test')
+                 routing_key='asynq_test',
+                 sender=True)
     try:
-        send.run()
+        send.send({'bisko':'basko'})
     except KeyboardInterrupt:
         send.stop()
 
