@@ -5,7 +5,6 @@ import pika
 import json
 import logging
 
-
 # TODO: We must setup an instance (?) for each time a message is sent: otherwise ioloop blocks
 import time
 
@@ -16,7 +15,7 @@ class ASynQ(object):
     """
 
     def __init__(self, url, routing_key, log_file='/dev/null', exchange='yacamc_exchange', exchange_type='direct',
-                 queue=None, acked=True, sender = False):
+                 queue=None, acked=True, sender=False):
         """
         this will set up an asynchronous queue on rabbitmq at url, with routing key routing_key, or give access if it
         already exists
@@ -58,9 +57,11 @@ class ASynQ(object):
         self._message_number = 0
         self._stopping = False
         self._done_sending = False
+        self.message = ""
+        self.sender = sender
 
-        self.run()
-        #self._connection = self.connect()
+        # self.run()
+        # self._connection = self.connect()
 
     def start_loop(self):
         self._connection.ioloop.start()
@@ -85,7 +86,7 @@ class ASynQ(object):
         self._deliveries.remove(method_frame.method.delivery_tag)
         self.logger.info('published %i messages, %i yet to confirm, %i acked and %i nacked', self._message_number,
                          len(self._deliveries), self._acked, self._nacked)
-        self._done_sending = True
+        self.stop()
 
     def on_bindok(self, unused_frame):
         """
@@ -99,6 +100,11 @@ class ASynQ(object):
             # if we wish to care about the servers replies, this is were we set up things
             self.logger.info('issuing confirm.select RPC')
             self._channel.confirm_delivery(self.on_delivery_confirmation)
+
+        if self.sender:
+            self.send()
+        else:
+            self.start_consuming(self.cb)
 
     def on_queue_declareok(self, method_frame):
         """
@@ -244,21 +250,23 @@ class ASynQ(object):
         self.logger.info('connecting to %s', self._url)
         return pika.SelectConnection(pika.URLParameters(self._url), self.on_connection_open, stop_ioloop_on_close=False)
 
-    def send(self,message):
+    def set_message(self, message):
+        self.message = message
+
+    def set_cb(self, cb):
+        self.cb = cb
+
+    def send(self):
         if self._stopping:
             return
         properties = pika.BasicProperties(app_id='sender',
                                           content_type='application/json',
-                                          headers=message)
+                                          headers=self.message)
 
-        self._channel.basic_publish(self.exchange, self.routing_key, json.dumps(message), properties)
+        self._channel.basic_publish(self.exchange, self.routing_key, json.dumps(self.message), properties)
         self._message_number += 1
         self._deliveries.append(self._message_number)
         self.logger.info('published message # %i', self._message_number)
-        self._connection.ioloop.start()
-        while not self._done_sending:
-            time.sleep(0.01)
-        self.stop()
 
     def stop(self):
         self.logger.info('stopping')
@@ -312,21 +320,36 @@ class ASynQ(object):
             self._channel.close()
 
     def run(self):
-        print("HEJ")
         self._connection = self.connect()
-        #self._connection.ioloop.start()
+        self._connection.ioloop.start()
 
-#class Receiver:
+
+# class Receiver:
 #    def __init__(self,url,routing_key,cb):
+
+def cb(ch, method, prop, body):
+    print(json.loads(body.decode('utf-8')))
+
 
 def main():
     send = ASynQ(url='amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600',
                  routing_key='asynq_test',
                  sender=True)
     try:
-        send.send({'bisko':'basko'})
+        send.set_message({'bisko': 'basko'})
+        send.run()
     except KeyboardInterrupt:
         send.stop()
+
+    rec = ASynQ(url='amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600',
+                routing_key='asynq_test',
+                sender=False)
+
+    try:
+        rec.set_cb(cb)
+        rec.run()
+    except KeyboardInterrupt:
+        rec.stop()
 
 
 if __name__ == "__main__":
