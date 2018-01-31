@@ -90,11 +90,15 @@ class ASynQ(object):
 
     def on_bindok(self, unused_frame):
         """
-        This is called once the queue has been successfully bound to the exchange via the routing_key
+        This is called once the queue has been successfully bound to the exchange via the routing_key. Depending on
+        self.sender in will call the send function to put the message on the queue (and eventually close and end the
+        object), or start the wait for callback loop in start_consuming
 
         :param unused_frame: unused
         :return: None
         """
+
+        print("HEEEEEEEEEEEEEEEEEEEEEE")
         self.logger.info('queue bound')
         if self.acked:
             # if we wish to care about the servers replies, this is were we set up things
@@ -104,7 +108,7 @@ class ASynQ(object):
         if self.sender:
             self.send()
         else:
-            self.start_consuming(self.cb)
+            self.start_consuming()
 
     def on_queue_declareok(self, method_frame):
         """
@@ -250,25 +254,31 @@ class ASynQ(object):
         self.logger.info('connecting to %s', self._url)
         return pika.SelectConnection(pika.URLParameters(self._url), self.on_connection_open, stop_ioloop_on_close=False)
 
-    def set_message(self, message):
-        self.message = message
-
-    def set_cb(self, cb):
-        self.cb = cb
-
     def send(self):
+        """
+        this function does the actual sending of the message put into self.message
+
+        :return:
+        """
         if self._stopping:
             return
         properties = pika.BasicProperties(app_id='sender',
                                           content_type='application/json',
                                           headers=self.message)
 
-        self._channel.basic_publish(self.exchange, self.routing_key, json.dumps(self.message), properties)
+        print(self.message)
+
+        self._channel.basic_publish(self.exchange, self.routing_key, self.message, properties)
         self._message_number += 1
         self._deliveries.append(self._message_number)
         self.logger.info('published message # %i', self._message_number)
 
     def stop(self):
+        """
+        this function closes the channel and connection. The ioloop is started again to finalize the stopping.
+
+        :return:
+        """
         self.logger.info('stopping')
         self._stopping = True
         if self._channel:
@@ -278,57 +288,97 @@ class ASynQ(object):
         self._connection.ioloop.start()
         self.logger.info('stopped')
 
-    def start_consuming(self, cb=None):
-        if cb is None:
+    def start_consuming(self):
+        """
+        this sets up two things: the cancel callback for the queue (that takes down the channel and the connection)
+        and the function to be called if a message is received on the queue
+
+        :return:
+        """
+        if self.cb is None:
+            # this should never happen
             self.logger.error('consumption requires a callback routine')
             return
 
-        self.logger.info('consuming started')
-        self.add_on_cancel_callback()
+        self.logger.info('consuming started, adding cancel callback')
+        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
         self._consumer_tag = self._channel.basic_consume(self.on_message, self.queue)
 
-    def add_on_cancel_callback(self):
-        self.logger.info('adding cancel callback for consumer')
-        self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
-
     def on_consumer_cancelled(self, method_frame):
+        """
+        this is the function called, if the consumer thread decides to stop consuming. It starts the cascade that
+        takes down the connection and the channel
+
+        :param method_frame: the method frame
+        :return:
+        """
         self.logger.info('consumer cancelled %r', method_frame)
         if self._channel:
             self._channel.close()
 
     def on_message(self, channel, method, properties, body):
+        """
+        the message called when a message is received. It possibly acknowledges the message, and then calls the
+        callback routine defined by the user
+
+        :param channel: the channel of the object
+        :param method: the method of the message
+        :param properties: the properties of this message
+        :param body: the message itself
+        :return:
+        """
         if self.acked:
             self.acknowledge_message(method.delivery_tag)
         if self.cb is not None:
-            # call the userspecified callback
+            # call the user specified callback
             self.cb(channel, method, properties, body)
         else:
             self.logger.error("Received message, but no callback routine set")
 
     def acknowledge_message(self, delivery_tag):
+        """
+        this acks a message received by a consumer thread
+
+        :param delivery_tag: The delivery tag of the message being acked
+        :return:
+        """
         self.logger.info('acknowledging message %s', delivery_tag)
         self._channel.basic_ack(delivery_tag)
 
-    def stop_consuming(self):
-        if self._channel:
-            self.logger.info('sending basic cancel')
-            self._channel.basic_cancel(self.on_cancelok, self._consumer_tag)
-
-    def on_cancelok(self, unused_frame):
-        self.logger.info('ackknowledged cancelation of consumer')
-        if self._channel:
-            self._channel.close()
-
     def run(self):
+        """
+        this starts the actual ioloop
+
+        :return:
+        """
         self._connection = self.connect()
         self._connection.ioloop.start()
 
+    def serve(self,cb):
+        """
+        starts a consumer with callback cb
+
+        :param cb: the callback routine
+        :return: None
+        """
+        self.cb = cb
+        self.run()
+
+    def client(self,message):
+        """
+        send the message to the defined queue
+
+        :param message: the message to be sent
+        :return:
+        """
+        self.message = message
+        self.run()
 
 # class Receiver:
 #    def __init__(self,url,routing_key,cb):
 
 def cb(ch, method, prop, body):
-    print(json.loads(body.decode('utf-8')))
+    print(body.decode('utf-8'))
 
 
 def main():
@@ -336,8 +386,7 @@ def main():
                  routing_key='asynq_test',
                  sender=True)
     try:
-        send.set_message({'bisko': 'basko'})
-        send.run()
+        send.client("hej")
     except KeyboardInterrupt:
         send.stop()
 
@@ -346,8 +395,7 @@ def main():
                 sender=False)
 
     try:
-        rec.set_cb(cb)
-        rec.run()
+        rec.serve(cb)
     except KeyboardInterrupt:
         rec.stop()
 
