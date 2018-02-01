@@ -11,7 +11,7 @@ class ASynQ(object):
     """
 
     def __init__(self, url, routing_key, log_file='/dev/null', exchange='yacamc_exchange', exchange_type='direct',
-                 queue=None, acked=True, sender=False, otq = False):
+                 queue=None, acked=True, sender=False, otq = False, log_level=logging.FATAL):
         """
         this will set up an asynchronous queue on rabbitmq at url, with routing key routing_key, or give access if it
         already exists
@@ -43,7 +43,7 @@ class ASynQ(object):
 
         log_format = '%(levelname) -10s %(asctime)s %(name) -30s %(funcName) -35s %(lineno) -5d: %(message)s'
         handler = logging.FileHandler(log_file)
-        logging.basicConfig(level=logging.INFO, format=log_format)
+        logging.basicConfig(level=log_level, format=log_format)
         self.logger = logging.getLogger(__name__)
         self.logger.addHandler(handler)
 

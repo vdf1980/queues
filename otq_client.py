@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import time
-
 from asynq import asynq
 
 
@@ -10,21 +8,11 @@ def main():
     :return: None
     """
 
-    i = 0
+    rec = asynq.ASynQ(url='amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600',
+                      routing_key='asynq_otq',
+                      sender=True, otq=True)
 
-    try:
-        while True:
-            rec = asynq.ASynQ(url='amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600',
-                              routing_key='asynq_otq',
-                              sender=True,otq=True)
-
-            rec.client({"hej":"3"})
-            #rec.client("HEJ")
-            i += 1
-            time.sleep(4)
-
-    except KeyboardInterrupt:
-        pass
+    rec.client({"hej": "3"})
 
 
 if __name__ == "__main__":
