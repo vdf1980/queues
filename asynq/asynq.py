@@ -11,7 +11,7 @@ class ASynQ(object):
     """
 
     def __init__(self, url, routing_key, log_file='/dev/null', exchange='yacamc_exchange', exchange_type='direct',
-                 queue=None, acked=True, sender=False):
+                 queue=None, acked=True, sender=False, otq = False):
         """
         this will set up an asynchronous queue on rabbitmq at url, with routing key routing_key, or give access if it
         already exists
@@ -33,6 +33,7 @@ class ASynQ(object):
         self.routing_key = routing_key
         self._url = url
         self.acked = acked
+        self.otq = otq
 
         self.cb = None
 
@@ -42,7 +43,7 @@ class ASynQ(object):
 
         log_format = '%(levelname) -10s %(asctime)s %(name) -30s %(funcName) -35s %(lineno) -5d: %(message)s'
         handler = logging.FileHandler(log_file)
-        logging.basicConfig(level=logging.DEBUG, format=log_format)
+        logging.basicConfig(level=logging.INFO, format=log_format)
         self.logger = logging.getLogger(__name__)
         self.logger.addHandler(handler)
 
@@ -94,7 +95,6 @@ class ASynQ(object):
         :return: None
         """
 
-        print("HEEEEEEEEEEEEEEEEEEEEEE")
         self.logger.info('queue bound')
         if self.acked:
             # if we wish to care about the servers replies, this is were we set up things
@@ -124,7 +124,10 @@ class ASynQ(object):
         :return: None
         """
         self.logger.info('declaring queue %s', self.queue)
-        self._channel.queue_declare(self.on_queue_declareok, self.queue)
+        if self.otq:
+            self._channel.queue_declare(self.on_queue_declareok, self.queue, auto_delete=True)
+        else:
+            self._channel.queue_declare(self.on_queue_declareok, self.queue)
 
     # The following sets up the exchange, which is the part of the queueing system that determines how messages are
     # sent from producers to consumers
@@ -339,6 +342,8 @@ class ASynQ(object):
         if self.cb is not None:
             # call the user specified callback
             self.cb(channel, method, properties, body)
+            if self.otq:
+                self.stop()
         else:
             self.logger.error("Received message, but no callback routine set")
 
