@@ -259,11 +259,23 @@ class ASynQ(object):
         """
         if self._stopping:
             return
-        properties = pika.BasicProperties(app_id='sender',
-                                          content_type='application/json',
-                                          headers=self.message)
 
-        self._channel.basic_publish(self.exchange, self.routing_key, json.dumps(self.message), properties)
+        mytype = 'text/plain'
+
+        try:
+            if isinstance(json.loads(self.message),dict):
+                mytype = 'application/json'
+        except (TypeError,json.JSONDecodeError):
+            if (isinstance(self.message,dict)):
+                mytype = 'application/json'
+                self.message = json.dumps(self.message)
+            else:
+                self.message = str(self.message)
+
+        properties = pika.BasicProperties(app_id='sender',
+                                          content_type=mytype)
+
+        self._channel.basic_publish(self.exchange, self.routing_key, self.message, properties)
         self._message_number += 1
         self._deliveries.append(self._message_number)
         self.logger.info('published message # %i', self._message_number)

@@ -20,6 +20,7 @@ def main():
                               sender=True)
 
             rec.client({"hej":"3"})
+            #rec.client("HEJ")
             i += 1
             time.sleep(4)
 
