@@ -8,7 +8,7 @@ def main():
     :return: None
     """
 
-    rec = asynq.ASynQ(url='amqp://guest:guest@localhost:5672/%2F?connection_attempts=3&heartbeat_interval=3600',
+    rec = asynq.ASynQ(url='amqp://guest:guest@localhost:5672/?connection_attempts=3&heartbeat_interval=3600',
                       routing_key='asynq_otq',
                       sender=True, otq=True)
 
