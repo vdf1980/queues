@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
-import threading
+import json
 
 import pika
-import json
 import logging
-
-# TODO: We must setup an instance (?) for each time a message is sent: otherwise ioloop blocks
-import time
 
 
 class ASynQ(object):
@@ -106,6 +102,7 @@ class ASynQ(object):
             self._channel.confirm_delivery(self.on_delivery_confirmation)
 
         if self.sender:
+            pass
             self.send()
         else:
             self.start_consuming()
@@ -266,9 +263,7 @@ class ASynQ(object):
                                           content_type='application/json',
                                           headers=self.message)
 
-        print(self.message)
-
-        self._channel.basic_publish(self.exchange, self.routing_key, self.message, properties)
+        self._channel.basic_publish(self.exchange, self.routing_key, json.dumps(self.message), properties)
         self._message_number += 1
         self._deliveries.append(self._message_number)
         self.logger.info('published message # %i', self._message_number)

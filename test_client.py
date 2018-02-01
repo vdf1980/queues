@@ -21,7 +21,7 @@ def main():
 
             rec.client({"hej":"3"})
             i += 1
-            time.sleep(4000)
+            time.sleep(4)
 
     except KeyboardInterrupt:
         pass
